@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "roccai",
+  "description": "Marketplace for Roccai-internal Claude Code plugins.",
+  "owner": {
+    "name": "Ida Brønden Damsgaard",
+    "email": "id@roccai.com"
+  },
+  "plugins": [
+    {
+      "name": "roccai",
+      "description": "Roccai-internal Claude Code tooling. Ships /roccai:review for PR-style code review.",
+      "category": "development",
+      "source": "./plugins/roccai"
+    }
+  ]
+}

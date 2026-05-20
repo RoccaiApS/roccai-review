@@ -1,0 +1,8 @@
+{
+  "name": "roccai",
+  "description": "Roccai-internal Claude Code tooling. Currently ships /roccai:review for PR-style code review with configurable scope, level, and parallel subagents.",
+  "author": {
+    "name": "Ida Brønden Damsgaard",
+    "email": "id@roccai.com"
+  }
+}
