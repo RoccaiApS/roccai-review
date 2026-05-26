@@ -37,6 +37,55 @@ The main `/roccai-review` command will pass you:
 
 Be honest with confidence scores. If you're not sure the rule applies in this context, set confidence below 80 and the main command may filter it.
 
+## Feature-flag wiring detection
+
+Detect addition of a `release_*` feature flag by looking for four signals in added (`+`) lines of the diff:
+
+| # | Signal | Where it appears |
+|---|---|---|
+| 1 | New entry in a `FeatureFlags` interface / dict | `roccai-dashboard/projects/shared-library/src/models/featureFlags.model.ts`, backend adapter files (`featureToggleAdapter.ts`, `feature_flag_adapter.py`) |
+| 2 | New entry in `DEFAULT_FLAGS` / `defaultConfig` | Same backend adapter files |
+| 3 | New `releaseXxx()` method | `feature-toggle.service.ts` in dashboard + Guide |
+| 4 | New `release_*` string literal | Anywhere in code |
+
+Group signals by camelCase flag name (snake_case Firebase keys normalize via lowercase + underscore → camelCase).
+
+Threshold:
+- Signals **1 AND 2 AND 3** all present for the same flag name → emit a `feature-flag-added` finding (severity `minor`, include the `flagName` and the list of files showing each signal).
+- One or two of {1, 2, 3} present, OR only signal 4 present → emit `incomplete-feature-flag-wiring` (severity `major`, list which canonical pieces are missing).
+- Zero signals → no finding.
+
+Signal 4 is informational and never gates the threshold by itself.
+
+**Output format for `feature-flag-added` finding**:
+```json
+{
+  "severity": "minor",
+  "type": "feature-flag-added",
+  "flagName": "releaseXxx",
+  "files": [
+    {"signal": 1, "path": "...", "line": "..."},
+    {"signal": 2, "path": "...", "line": "..."},
+    {"signal": 3, "path": "...", "line": "..."}
+  ],
+  "description": "New feature flag `releaseXxx` detected — removal reminder ticket will be queued for ClickUp sync in Phase 5c."
+}
+```
+
+**Output format for `incomplete-feature-flag-wiring` finding**:
+```json
+{
+  "severity": "major",
+  "type": "incomplete-feature-flag-wiring",
+  "flagName": "releaseXxx",
+  "missing": ["signal-1 (FeatureFlags interface entry)", "signal-3 (FeatureToggleService getter)"],
+  "files": [...],
+  "description": "Feature flag `releaseXxx` is partially wired. Missing: FeatureFlags interface entry, FeatureToggleService getter. Fix before merging — partial flags don't evaluate correctly."
+}
+```
+
+These finding types feed into the existing Phase 5 review loop. The Phase 5c re-scan re-runs the same detection on the cumulative post-fix diff and is the authoritative trigger for ClickUp ticket creation.
+
 ## What you do NOT do
 
 - Do not check naming, comment style, or formatting â€” those are other agents' jobs.

@@ -351,6 +351,24 @@ Sequential per repo.
 
 ---
 
+## Phase 5c — Flag ticket sync
+
+Runs after Phase 5b (test re-verification) and before Phase 6 (summary). Two responsibilities:
+
+1. **Second-pass flag detection**: re-scan the cumulative diff (original branch-own diff + accepted fixes from Phase 5) using the same 4-signal rules as `focus-conventions`. Collect flags where signals 1 AND 2 AND 3 are all present. This is the authoritative list of flags needing ClickUp sync — dismissed first-pass findings won't appear, fixed `incomplete-feature-flag-wiring` will.
+
+2. **Dispatch the `clickup-flag-sync` subagent** with these inputs:
+   - `mode`: `sync`
+   - `flags`: the list of flag names from the second-pass scan
+   - `workspaceRepos`: the list of repos detected in Phase 1 (so the agent knows whether `roccai-dashboard` is available for the docs table update)
+   - `reviewRepos`: the subset of repos that were actually reviewed in this session
+
+Skip this entire phase silently if the second-pass scan finds zero flags.
+
+If the agent returns with deferred warnings (Cases A/C/D, retry failures, duplicate-ticket anomalies), those flow into Phase 6's `Known issues` section unmodified.
+
+---
+
 ## Phase 6 — Final summary (with user verification)
 
 Spawn `summary-drafter`. Pass: per-repo diff, resolved findings, deferred findings.
