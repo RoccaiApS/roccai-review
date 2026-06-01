@@ -24,96 +24,64 @@ afterEach(() => {
   try { fs.unlinkSync(tmpSettings); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 });
 
-test('creates settings.json with MCP entry when file does not exist', () => {
-  runHook(['--token', 'pk_test123', '--team', '999']);
-  const s = readSettings();
-  assert.deepStrictEqual(s.mcpServers.clickup, {
-    command: 'npx',
-    args: ['-y', '@taazkareem/clickup-mcp-server'],
-    env: { CLICKUP_API_KEY: 'pk_test123', CLICKUP_TEAM_ID: '999' },
-  });
-});
-
-test('merges MCP entry into existing settings.json preserving other fields', () => {
-  fs.writeFileSync(tmpSettings, JSON.stringify({
-    permissions: { allow: ['Bash(git:*)'] },
-    model: 'opus[1m]',
-    mcpServers: { existing: { command: 'foo' } },
-  }, null, 2));
-  runHook(['--token', 'pk_new', '--team', '42']);
-  const s = readSettings();
-  assert.deepStrictEqual(s.permissions, { allow: ['Bash(git:*)'] });
-  assert.strictEqual(s.model, 'opus[1m]');
-  assert.strictEqual(s.mcpServers.existing.command, 'foo');
-  assert.strictEqual(s.mcpServers.clickup.env.CLICKUP_API_KEY, 'pk_new');
-});
-
-test('overwrites existing clickup MCP entry when token changes', () => {
-  fs.writeFileSync(tmpSettings, JSON.stringify({
-    mcpServers: { clickup: { command: 'npx', args: [], env: { CLICKUP_API_KEY: 'pk_old', CLICKUP_TEAM_ID: '1' } } },
-  }, null, 2));
-  runHook(['--token', 'pk_new', '--team', '2']);
-  const s = readSettings();
-  assert.strictEqual(s.mcpServers.clickup.env.CLICKUP_API_KEY, 'pk_new');
-  assert.strictEqual(s.mcpServers.clickup.env.CLICKUP_TEAM_ID, '2');
-});
-
-test('writes only roccai.clickupUserId when --user-id passed without token', () => {
-  fs.writeFileSync(tmpSettings, JSON.stringify({
-    mcpServers: { clickup: { command: 'npx', args: [], env: { CLICKUP_API_KEY: 'pk_keep', CLICKUP_TEAM_ID: '1' } } },
-  }, null, 2));
+test('creates settings.json with roccai.clickupUserId when file does not exist', () => {
   runHook(['--user-id', 'usr_42']);
   const s = readSettings();
   assert.strictEqual(s.roccai.clickupUserId, 'usr_42');
-  assert.strictEqual(s.mcpServers.clickup.env.CLICKUP_API_KEY, 'pk_keep');
 });
 
-test('writes both MCP entry and user ID in a single invocation', () => {
-  runHook(['--token', 'pk_a', '--team', '7', '--user-id', 'usr_9']);
+test('merges roccai.clickupUserId into existing settings preserving other fields', () => {
+  fs.writeFileSync(tmpSettings, JSON.stringify({
+    permissions: { allow: ['Bash(git:*)'] },
+    model: 'opus[1m]',
+  }, null, 2));
+  runHook(['--user-id', 'usr_new']);
   const s = readSettings();
-  assert.strictEqual(s.mcpServers.clickup.env.CLICKUP_API_KEY, 'pk_a');
-  assert.strictEqual(s.roccai.clickupUserId, 'usr_9');
+  assert.deepStrictEqual(s.permissions, { allow: ['Bash(git:*)'] });
+  assert.strictEqual(s.model, 'opus[1m]');
+  assert.strictEqual(s.roccai.clickupUserId, 'usr_new');
 });
 
-test('is idempotent - running twice with same values produces identical file', () => {
-  runHook(['--token', 'pk_a', '--team', '7']);
+test('overwrites existing roccai.clickupUserId', () => {
+  fs.writeFileSync(tmpSettings, JSON.stringify({
+    roccai: { clickupUserId: 'usr_old' },
+  }, null, 2));
+  runHook(['--user-id', 'usr_new']);
+  const s = readSettings();
+  assert.strictEqual(s.roccai.clickupUserId, 'usr_new');
+});
+
+test('is idempotent — running twice with same values produces identical file', () => {
+  runHook(['--user-id', 'usr_a']);
   const first = fs.readFileSync(tmpSettings, 'utf8');
-  runHook(['--token', 'pk_a', '--team', '7']);
+  runHook(['--user-id', 'usr_a']);
   const second = fs.readFileSync(tmpSettings, 'utf8');
   assert.strictEqual(first, second);
 });
 
 test('exits with non-zero code when settings.json is invalid JSON', () => {
   fs.writeFileSync(tmpSettings, '{ this is not json');
-  assert.throws(() => runHook(['--token', 'pk_a', '--team', '7']));
+  assert.throws(() => runHook(['--user-id', 'usr_a']));
 });
 
-test('exits with non-zero code when no flags are provided', () => {
+test('exits with non-zero code when --user-id is missing', () => {
   assert.throws(() => runHook([]));
 });
 
-test('exits with non-zero code when --token is given a flag-shaped value', () => {
-  assert.throws(() => runHook(['--token', '--team', '99']));
-});
-
-test('exits with non-zero code when --team is missing entirely', () => {
-  assert.throws(() => runHook(['--token', 'pk_x']));
+test('exits with non-zero code when --user-id is given a flag-shaped value', () => {
+  assert.throws(() => runHook(['--user-id', '--settings-path']));
 });
 
 test('exits with non-zero code when an unknown flag is passed', () => {
-  assert.throws(() => runHook(['--foo', 'bar', '--token', 'pk_x', '--team', '1']));
+  assert.throws(() => runHook(['--foo', 'bar', '--user-id', 'usr_x']));
 });
 
-test('exits with non-zero code when --token is used without --team', () => {
-  assert.throws(() => runHook(['--token', 'pk_a']));
-});
-
-test('preserves existing roccai.clickupUserId when only credentials are updated', () => {
+test('preserves other roccai.* fields when updating clickupUserId', () => {
   fs.writeFileSync(tmpSettings, JSON.stringify({
-    roccai: { clickupUserId: 'usr_existing' },
+    roccai: { clickupUserId: 'usr_old', somethingElse: 'preserve-me' },
   }, null, 2));
-  runHook(['--token', 'pk_new', '--team', '99']);
+  runHook(['--user-id', 'usr_new']);
   const s = readSettings();
-  assert.strictEqual(s.roccai.clickupUserId, 'usr_existing');
-  assert.strictEqual(s.mcpServers.clickup.env.CLICKUP_API_KEY, 'pk_new');
+  assert.strictEqual(s.roccai.clickupUserId, 'usr_new');
+  assert.strictEqual(s.roccai.somethingElse, 'preserve-me');
 });
