@@ -56,7 +56,7 @@ Which repos? Reply with one of:
   • "active" (★ ones) / "active develop,master,..."
   • names: "roccai-dashboard, decisiontree" or "roccai-dashboard develop, decisiontree master"
 
-Base branch (the parent the current branch was branched off) is optional. Omitted entries trigger a follow-up prompt; topology auto-detection runs only as final fallback.
+Base branch (the parent the current branch was branched off) is optional. Four repos have sensible defaults applied silently when omitted (roccai-dashboard→develop, enduserbackendmerrymake→master, decisiontree→develop, journeyprocessormerrymake→google-dev). Other omitted entries trigger a follow-up prompt; topology auto-detection runs only as final fallback.
 ```
 
 Stop and wait for the reply. Parse it forgivingly — accept any combination of commas and whitespace as separators, recover from missing commas where the structure is unambiguous:
@@ -92,6 +92,21 @@ Per entry (after the comma/whitespace split): 1 token = index only; 2 tokens = `
 Per entry: 1 token = name only; 2 tokens = `<name> <base>`.
 
 Store per repo: `repo`, `providedBase` (or null). Validate provided bases with `git -C <repo> rev-parse --verify origin/<providedBase>`; warn and re-ask only the failed entries (do not require the user to retype the whole list).
+
+### Phase 1a — Apply default base branches
+
+Before asking for missing bases, fill in `providedBase` from this default table for any selected repo whose `providedBase` is still null (i.e. the user did not specify a base for it). These defaults are almost always the correct parent, so applying them is silent — treat the result exactly as if the user had typed that base. No prompt, no auto-detection.
+
+| Repo                        | Default base |
+| --------------------------- | ------------ |
+| `roccai-dashboard`          | `develop`    |
+| `enduserbackendmerrymake`   | `master`     |
+| `decisiontree`              | `develop`    |
+| `journeyprocessormerrymake` | `google-dev` |
+
+For each repo a default is applied to, validate it with `git -C <repo> rev-parse --verify origin/<default>`. On success, set `providedBase = <default>`. On failure (branch missing), leave `providedBase = null` so the repo falls through to Phase 1b — do not warn the user, the default simply doesn't apply.
+
+Repos not in this table, and repos where the default failed validation, keep `providedBase = null` and go through Phase 1b as before.
 
 ### Phase 1b — Ask for missing bases
 
